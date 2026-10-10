@@ -139,6 +139,10 @@
       <HintPath>$(LastEpochPath)\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.DirectorModule">
+      <HintPath>$(LastEpochPath)\MelonLoader\Il2CppAssemblies\UnityEngine.DirectorModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.ImageConversionModule">
       <HintPath>$(LastEpochPath)\MelonLoader\Il2CppAssemblies\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>False</Private>

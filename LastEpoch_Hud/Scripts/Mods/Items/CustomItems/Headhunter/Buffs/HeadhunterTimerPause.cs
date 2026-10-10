@@ -6,15 +6,19 @@ using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Config.Resolve;
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause;
 using LastEpoch_Hud.Scripts.Mods.Items.CustomItems.Headhunter.Bar;
 using LastEpoch_Hud.Scripts.ModUI;
+using UnityEngine;
+using UnityEngine.Playables;
 
 namespace LastEpoch_Hud.Scripts.Mods.Items.CustomItems.Headhunter.Buffs;
 
-/// <summary>Applies the zone, arrival, cinematic and boss intro pause to the player's HH buffs.</summary>
+/// <summary>Applies the zone, arrival, cinematic, boss intro and cutscene pause to the player's HH buffs.</summary>
 internal static class HeadhunterTimerPause
 {
     private static float[] _live = Array.Empty<float>();
 
     private static readonly HeadhunterZonePause _zone = new();
+
+    private static PlayableDirector _cutsceneDirector;
 
     public static HeadhunterTimerFreeze Freeze => _zone.Freeze;
 
@@ -22,6 +26,7 @@ internal static class HeadhunterTimerPause
 
     public static void OnSceneLoaded(string sceneName, double now)
     {
+        DropCutscene(now);
         bool nonCombat = IsNonCombat(sceneName);
         HeadhunterPauseChange change = _zone.OnScene(sceneName, nonCombat, now);
         if (ModSettings.Debug.Enabled.Value)
@@ -44,6 +49,7 @@ internal static class HeadhunterTimerPause
         PollArrival(now);
         PollCinematic(now);
         PollBossIntroExpiry(now);
+        PollCutscene(now);
     }
 
     /// <summary>Freezes timers while a long boss intro plays.</summary>
@@ -79,9 +85,33 @@ internal static class HeadhunterTimerPause
         }
     }
 
+    /// <summary>Freezes timers while a cutscene plays in a combat zone.</summary>
+    public static void OnCutsceneStart(
+        PlayableDirector director,
+        string id,
+        double durationSeconds,
+        double now
+    )
+    {
+        if (!_zone.TryStartCutscene(id, durationSeconds, now))
+        {
+            return;
+        }
+
+        _cutsceneDirector = director;
+        ApplyPending();
+        HeadhunterBuffBar.MarkDirty();
+        if (ModSettings.Debug.Enabled.Value)
+        {
+            HeadhunterCutscene cutscene = new(id, durationSeconds, now);
+            Main.logger_instance?.Msg(HeadhunterPauseLog.CutsceneStarted(_zone.Scene, cutscene));
+        }
+    }
+
     /// <summary>Drops the arrival watch and kept timers after HH buffs were removed.</summary>
     public static void Clear()
     {
+        _cutsceneDirector = null;
         _zone.Clear();
     }
 
@@ -147,6 +177,66 @@ internal static class HeadhunterTimerPause
                     HeadhunterPauseLog.BossIntroExpired(_zone.Scene, intro, held)
                 );
             }
+        }
+    }
+
+    /// <summary>Resumes timers when the held cutscene stops, vanishes or runs out.</summary>
+    private static void PollCutscene(double now)
+    {
+        if (!_zone.HasCutscene)
+        {
+            return;
+        }
+
+        if (!_zone.TryEndCutscene(ReadCutsceneState(), now, out HeadhunterCutsceneStop stop))
+        {
+            return;
+        }
+
+        _cutsceneDirector = null;
+        ApplyPending();
+        HeadhunterBuffBar.MarkDirty();
+        if (ModSettings.Debug.Enabled.Value)
+        {
+            Main.logger_instance?.Msg(HeadhunterPauseLog.CutsceneEnded(_zone.Scene, stop));
+        }
+    }
+
+    /// <summary>Logs a cutscene still held at scene load; the zone reset clears the hold itself.</summary>
+    private static void DropCutscene(double now)
+    {
+        _cutsceneDirector = null;
+        if (!ModSettings.Debug.Enabled.Value)
+        {
+            return;
+        }
+
+        if (
+            _zone.TryPeekCutscene(now, HeadhunterCutsceneEnd.Scene, out HeadhunterCutsceneStop stop)
+        )
+        {
+            Main.logger_instance?.Msg(HeadhunterPauseLog.CutsceneEnded(_zone.Scene, stop));
+        }
+    }
+
+    /// <summary>Reads the held director: gone, stopped (Unity reports Paused) or playing.</summary>
+    private static HeadhunterCutsceneState ReadCutsceneState()
+    {
+        try
+        {
+            if (_cutsceneDirector.IsNullOrDestroyed())
+            {
+                return HeadhunterCutsceneState.Missing;
+            }
+
+            return _cutsceneDirector.state == PlayState.Paused
+                ? HeadhunterCutsceneState.Stopped
+                : HeadhunterCutsceneState.Playing;
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Report(ex, "Headhunter cutscene check");
+            return HeadhunterCutsceneState.Missing;
         }
     }
 

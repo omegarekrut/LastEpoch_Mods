@@ -375,6 +375,135 @@ public sealed class HeadhunterZonePauseTests
         Assert.False(_zone.Freeze.IsPaused);
     }
 
+    [Fact]
+    public void Cutscene_Hostile_PausesThenStopResumes()
+    {
+        StartHostileAndEndArrival();
+
+        bool started = _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        Assert.True(started);
+        Assert.True(_zone.HasCutscene);
+        Assert.True(_zone.Freeze.IsPaused);
+
+        bool ended = _zone.TryEndCutscene(
+            HeadhunterCutsceneState.Stopped,
+            Start + 7,
+            out HeadhunterCutsceneStop stop
+        );
+
+        Assert.True(ended);
+        Assert.Equal(HeadhunterCutsceneEnd.Stopped, stop.By);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Cutscene_Playing_StaysPaused()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        bool ended = _zone.TryEndCutscene(HeadhunterCutsceneState.Playing, Start + 5, out _);
+
+        Assert.False(ended);
+        Assert.True(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Cutscene_NonCombatZone_Ignored()
+    {
+        _zone.OnScene(Town, true, Start);
+
+        bool started = _zone.TryStartCutscene("FakeA", 20, Start + 1);
+
+        Assert.False(started);
+        Assert.False(_zone.HasCutscene);
+    }
+
+    [Fact]
+    public void Cutscene_WithBossIntro_ResumesOnlyWhenBothEnd()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartBossIntro(1, "FakeA", 12f, Start + 2);
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        bool ended = _zone.TryEndCutscene(HeadhunterCutsceneState.Missing, Start + 5, out _);
+        Assert.True(ended);
+        Assert.False(_zone.HasCutscene);
+        Assert.True(_zone.Freeze.IsPaused);
+
+        _zone.TryEndBossIntro(1, Start + 6, out _, out _);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Cutscene_DuringArrival_StaysPausedAfterEnd()
+    {
+        _zone.OnScene(Hostile, false, Start);
+        _zone.TryStartCutscene("FakeA", 20, Start + 0.5);
+
+        bool ended = _zone.TryEndCutscene(HeadhunterCutsceneState.Missing, Start + 5, out _);
+
+        Assert.True(ended);
+        Assert.False(_zone.HasCutscene);
+        Assert.True(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Cutscene_DuringCinematic_StaysPausedAfterEnd()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryCinematic(true, Start + 2, out _);
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        bool ended = _zone.TryEndCutscene(HeadhunterCutsceneState.Missing, Start + 5, out _);
+
+        Assert.True(ended);
+        Assert.False(_zone.HasCutscene);
+        Assert.True(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void TryPeekCutscene_LeavesFreeze()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+        _zone.Freeze.Apply(_config, _live);
+        bool pendingBefore = _zone.Freeze.IsApplyPending;
+
+        bool peeked = _zone.TryPeekCutscene(Start + 4, HeadhunterCutsceneEnd.Scene, out _);
+
+        Assert.True(peeked);
+        Assert.True(_zone.Freeze.IsPaused);
+        Assert.True(_zone.HasCutscene);
+        Assert.Equal(pendingBefore, _zone.Freeze.IsApplyPending);
+    }
+
+    [Fact]
+    public void OnScene_DropsCutscene()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        _zone.OnScene(Hostile, false, Start + 3);
+        _zone.TryEndArrival(HeadhunterArrivalState.Damageable, Start + 4, out _);
+
+        Assert.False(_zone.HasCutscene);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Clear_DropsCutscene()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+
+        _zone.Clear();
+
+        Assert.False(_zone.HasCutscene);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
     private void EndOne(bool intro)
     {
         if (intro)

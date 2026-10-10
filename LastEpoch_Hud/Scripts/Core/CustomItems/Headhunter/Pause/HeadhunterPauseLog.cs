@@ -51,6 +51,16 @@ public static class HeadhunterPauseLog
         return $"Headhunter boss intro expired: scene={scene} actor={intro.Actor} duration={Seconds(intro.DurationSeconds)}s held={Seconds(heldSeconds)}s";
     }
 
+    public static string CutsceneStarted(string scene, HeadhunterCutscene cutscene)
+    {
+        return $"Headhunter cutscene started: scene={scene} id={cutscene.Id} duration={Seconds(cutscene.DurationSeconds)}s";
+    }
+
+    public static string CutsceneEnded(string scene, HeadhunterCutsceneStop stop)
+    {
+        return $"Headhunter cutscene ended: scene={scene} id={stop.Cutscene.Id} duration={Seconds(stop.Cutscene.DurationSeconds)}s held={Seconds(stop.HeldSeconds)}s by={CutsceneCause(stop.By)}";
+    }
+
     private static string Seconds(double seconds)
     {
         return seconds.ToString("0.00", CultureInfo.InvariantCulture);
@@ -60,6 +70,17 @@ public static class HeadhunterPauseLog
     private static string Cause(HeadhunterArrivalState state)
     {
         return state == HeadhunterArrivalState.Damageable ? "damageable" : "missing";
+    }
+
+    private static string CutsceneCause(HeadhunterCutsceneEnd by)
+    {
+        return by switch
+        {
+            HeadhunterCutsceneEnd.Duration => "duration",
+            HeadhunterCutsceneEnd.Stopped => "stopped",
+            HeadhunterCutsceneEnd.Missing => "missing",
+            _ => "scene",
+        };
     }
 
     private static string Timers(HeadhunterPauseChange change)

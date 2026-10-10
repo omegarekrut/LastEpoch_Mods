@@ -7,9 +7,14 @@ public static class HeadhunterPauseRule
         bool nonCombatZone,
         bool arrivalProtected,
         bool cinematicActive,
-        bool bossIntroActive
+        bool bossIntroActive,
+        bool cutscenePlaying
     )
     {
-        return nonCombatZone || arrivalProtected || cinematicActive || bossIntroActive;
+        return nonCombatZone
+            || arrivalProtected
+            || cinematicActive
+            || bossIntroActive
+            || cutscenePlaying;
     }
 }
