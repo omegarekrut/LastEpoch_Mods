@@ -18,6 +18,10 @@ public sealed class HeadhunterProbeLogTests
             HeadhunterProbeLog.Cinematic(FakeScene, "src", 5f, true, false, false),
             HeadhunterProbeLog.Cutscene(FakeScene, "id", 12f),
             HeadhunterProbeLog.BossEngaged(FakeScene, FakeActor, false, false),
+            HeadhunterProbeLog.VoiceStart(FakeScene, FakeActor, "death", 1, "abc", "k", true),
+            HeadhunterProbeLog.VoiceLength(FakeScene, FakeActor, 1f),
+            HeadhunterProbeLog.Bark(FakeScene, FakeActor, "abc", 1f),
+            HeadhunterProbeLog.DeathStart(FakeScene, FakeActor, KillKind.Boss, 1f, 2f),
         };
 
     [Theory]
@@ -121,6 +125,67 @@ public sealed class HeadhunterProbeLogTests
         string line = HeadhunterProbeLog.BossEngaged(FakeScene, FakeActor, true, false);
 
         Assert.Contains($"actor={FakeActor} calledToArms=yes diedBefore=no", line);
+    }
+
+    [Fact]
+    public void VoiceStart_HasSpeakerTriggerPriorityTextKeyPlaying()
+    {
+        string line = HeadhunterProbeLog.VoiceStart(
+            FakeScene,
+            FakeActor,
+            "death",
+            2,
+            "abc",
+            "FakeKey",
+            true
+        );
+
+        Assert.Contains(
+            $"speaker={FakeActor} trigger=death priority=2 textLen=3 key=FakeKey playing=yes",
+            line
+        );
+    }
+
+    [Fact]
+    public void VoiceStart_NullText_ZeroLengthAndQuestionMark()
+    {
+        string line = HeadhunterProbeLog.VoiceStart(FakeScene, "", "death", 2, null, null, false);
+
+        Assert.Contains("speaker=?", line);
+        Assert.Contains("textLen=0", line);
+        Assert.Contains("key=?", line);
+    }
+
+    [Fact]
+    public void VoiceLength_HasSpeakerDelay()
+    {
+        string line = HeadhunterProbeLog.VoiceLength(FakeScene, FakeActor, 8.2f);
+
+        Assert.Contains($"speaker={FakeActor} delay=8.20s", line);
+    }
+
+    [Fact]
+    public void Bark_HasSpeakerTextLenDisplay()
+    {
+        string line = HeadhunterProbeLog.Bark(FakeScene, FakeActor, "abcd", 4f);
+
+        Assert.Contains($"speaker={FakeActor} textLen=4 display=4.00s", line);
+    }
+
+    [Fact]
+    public void Bark_NullText_ZeroLength()
+    {
+        string line = HeadhunterProbeLog.Bark(FakeScene, FakeActor, null, 4f);
+
+        Assert.Contains("textLen=0", line);
+    }
+
+    [Fact]
+    public void DeathStart_HasActorKindDelays()
+    {
+        string line = HeadhunterProbeLog.DeathStart(FakeScene, FakeActor, KillKind.Boss, 1f, 15f);
+
+        Assert.Contains($"actor={FakeActor} kind=boss sinkDelay=1.00s destroyDelay=15.00s", line);
     }
 
     [Fact]

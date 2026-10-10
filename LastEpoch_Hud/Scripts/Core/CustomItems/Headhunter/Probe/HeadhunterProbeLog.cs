@@ -70,6 +70,50 @@ public static class HeadhunterProbeLog
             + $"calledToArms={YesNo(calledToArms)} diedBefore={YesNo(diedBeforeActivating)}";
     }
 
+    public static string VoiceStart(
+        string scene,
+        string speaker,
+        string trigger,
+        int priority,
+        string text,
+        string textKey,
+        bool playing
+    )
+    {
+        return $"{Prefix}voice start scene={Text(scene)} speaker={Text(speaker)} trigger={Text(trigger)} "
+            + $"priority={priority} textLen={TextLength(text)} key={Text(textKey)} playing={YesNo(playing)}";
+    }
+
+    public static string VoiceLength(string scene, string speaker, float delaySeconds)
+    {
+        return $"{Prefix}voice length scene={Text(scene)} speaker={Text(speaker)} "
+            + $"delay={Seconds(delaySeconds)}s";
+    }
+
+    public static string Bark(string scene, string speaker, string text, float displaySeconds)
+    {
+        return $"{Prefix}bark scene={Text(scene)} speaker={Text(speaker)} "
+            + $"textLen={TextLength(text)} display={Seconds(displaySeconds)}s";
+    }
+
+    public static string DeathStart(
+        string scene,
+        string actor,
+        KillKind kind,
+        float sinkingDelay,
+        float destructionDelay
+    )
+    {
+        return $"{Prefix}death start scene={Text(scene)} actor={Text(actor)} kind={Kind(kind)} "
+            + $"sinkDelay={Seconds(sinkingDelay)}s destroyDelay={Seconds(destructionDelay)}s";
+    }
+
+    /// <summary>Length of the text; 0 for null.</summary>
+    private static int TextLength(string text)
+    {
+        return text == null ? 0 : text.Length;
+    }
+
     private static string Seconds(double value)
     {
         return value.ToString("0.00", CultureInfo.InvariantCulture);
