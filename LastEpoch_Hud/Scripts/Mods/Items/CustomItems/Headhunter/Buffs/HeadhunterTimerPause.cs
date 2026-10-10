@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Il2Cpp;
+using Il2CppLE.UI.PanelSystem;
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Buffs;
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Config.Resolve;
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause;
+using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause.RewardMenu;
 using LastEpoch_Hud.Scripts.Mods.Items.CustomItems.Headhunter.Bar;
 using LastEpoch_Hud.Scripts.ModUI;
 using UnityEngine;
@@ -11,7 +13,7 @@ using UnityEngine.Playables;
 
 namespace LastEpoch_Hud.Scripts.Mods.Items.CustomItems.Headhunter.Buffs;
 
-/// <summary>Applies the zone, arrival, cinematic, boss intro and cutscene pause to the player's HH buffs.</summary>
+/// <summary>Applies the zone, arrival, cinematic, boss intro, cutscene and reward panel pause to the player's HH buffs.</summary>
 internal static class HeadhunterTimerPause
 {
     private static float[] _live = Array.Empty<float>();
@@ -19,14 +21,20 @@ internal static class HeadhunterTimerPause
     private static readonly HeadhunterZonePause _zone = new();
 
     private static PlayableDirector _cutsceneDirector;
+    private static Panel _rewardPanel;
 
     public static HeadhunterTimerFreeze Freeze => _zone.Freeze;
 
     public static bool HasBossIntro => _zone.HasBossIntro;
 
+    public static bool WatchesRewardMenus => _zone.WatchesRewardMenus;
+
+    public static bool HasRewardMenu => _zone.HasRewardMenu;
+
     public static void OnSceneLoaded(string sceneName, double now)
     {
         DropCutscene(now);
+        DropRewardMenu(now);
         bool nonCombat = IsNonCombat(sceneName);
         HeadhunterPauseChange change = _zone.OnScene(sceneName, nonCombat, now);
         if (ModSettings.Debug.Enabled.Value)
@@ -50,6 +58,7 @@ internal static class HeadhunterTimerPause
         PollCinematic(now);
         PollBossIntroExpiry(now);
         PollCutscene(now);
+        PollRewardMenu(now);
     }
 
     /// <summary>Freezes timers while a long boss intro plays.</summary>
@@ -108,10 +117,39 @@ internal static class HeadhunterTimerPause
         }
     }
 
+    /// <summary>Freezes timers while a reward-choice panel is open in a combat zone.</summary>
+    public static void OnRewardPanelOpen(Panel panel, string typeName, double now)
+    {
+        long id = panel.Pointer.ToInt64();
+        if (!_zone.TryStartRewardMenu(id, typeName, now))
+        {
+            return;
+        }
+
+        _rewardPanel = panel;
+        ApplyPending();
+        HeadhunterBuffBar.MarkDirty();
+        if (ModSettings.Debug.Enabled.Value)
+        {
+            HeadhunterRewardMenu menu = new(id, typeName, now);
+            Main.logger_instance?.Msg(HeadhunterPauseLog.RewardMenuStarted(_zone.Scene, menu));
+        }
+    }
+
+    /// <summary>Resumes timers when the game closes the held reward panel.</summary>
+    public static void OnRewardPanelClose(long id, double now)
+    {
+        if (_zone.TryCloseRewardMenu(id, now, out HeadhunterRewardMenuStop stop))
+        {
+            ReleaseRewardMenu(stop);
+        }
+    }
+
     /// <summary>Drops the arrival watch and kept timers after HH buffs were removed.</summary>
     public static void Clear()
     {
         _cutsceneDirector = null;
+        _rewardPanel = null;
         _zone.Clear();
     }
 
@@ -199,6 +237,73 @@ internal static class HeadhunterTimerPause
         if (ModSettings.Debug.Enabled.Value)
         {
             Main.logger_instance?.Msg(HeadhunterPauseLog.CutsceneEnded(_zone.Scene, stop));
+        }
+    }
+
+    /// <summary>Resumes timers when the held reward panel is destroyed, hidden or past the cap.</summary>
+    private static void PollRewardMenu(double now)
+    {
+        if (!_zone.HasRewardMenu)
+        {
+            return;
+        }
+
+        if (_zone.TryEndRewardMenu(ReadRewardMenuState(), now, out HeadhunterRewardMenuStop stop))
+        {
+            ReleaseRewardMenu(stop);
+        }
+    }
+
+    private static void ReleaseRewardMenu(HeadhunterRewardMenuStop stop)
+    {
+        _rewardPanel = null;
+        ApplyPending();
+        HeadhunterBuffBar.MarkDirty();
+        if (ModSettings.Debug.Enabled.Value)
+        {
+            Main.logger_instance?.Msg(HeadhunterPauseLog.RewardMenuEnded(_zone.Scene, stop));
+        }
+    }
+
+    /// <summary>Logs a reward panel still held at scene load; the zone reset clears the hold itself.</summary>
+    private static void DropRewardMenu(double now)
+    {
+        _rewardPanel = null;
+        if (!ModSettings.Debug.Enabled.Value)
+        {
+            return;
+        }
+
+        if (
+            _zone.TryPeekRewardMenu(
+                now,
+                HeadhunterRewardMenuEnd.Scene,
+                out HeadhunterRewardMenuStop stop
+            )
+        )
+        {
+            Main.logger_instance?.Msg(HeadhunterPauseLog.RewardMenuEnded(_zone.Scene, stop));
+        }
+    }
+
+    /// <summary>Reads the held panel: destroyed, inactive or open.</summary>
+    private static HeadhunterRewardMenuState ReadRewardMenuState()
+    {
+        try
+        {
+            if (_rewardPanel.IsNullOrDestroyed())
+            {
+                return HeadhunterRewardMenuState.Missing;
+            }
+
+            return _rewardPanel.isActiveAndEnabled
+                ? HeadhunterRewardMenuState.Open
+                : HeadhunterRewardMenuState.Hidden;
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Report(ex, "Headhunter reward menu check");
+            return HeadhunterRewardMenuState.Missing;
         }
     }
 

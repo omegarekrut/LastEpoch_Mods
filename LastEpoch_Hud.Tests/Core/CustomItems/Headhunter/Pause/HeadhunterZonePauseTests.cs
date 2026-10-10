@@ -1,5 +1,6 @@
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Config.Resolve;
 using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause;
+using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause.RewardMenu;
 
 namespace LastEpoch_Hud.Tests.Core.CustomItems.Headhunter.Pause;
 
@@ -502,6 +503,175 @@ public sealed class HeadhunterZonePauseTests
 
         Assert.False(_zone.HasCutscene);
         Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void RewardMenu_Hostile_PausesThenCloseResumes()
+    {
+        StartHostileAndEndArrival();
+
+        bool started = _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        Assert.True(started);
+        Assert.True(_zone.HasRewardMenu);
+        Assert.True(_zone.Freeze.IsPaused);
+        Assert.True(_zone.Freeze.IsApplyPending);
+
+        _zone.Freeze.Apply(_config, _live);
+        bool ended = _zone.TryCloseRewardMenu(1, Start + 7, out HeadhunterRewardMenuStop stop);
+
+        Assert.True(ended);
+        Assert.Equal(HeadhunterRewardMenuEnd.Closed, stop.By);
+        Assert.False(_zone.HasRewardMenu);
+        Assert.False(_zone.Freeze.IsPaused);
+        Assert.True(_zone.Freeze.IsApplyPending);
+    }
+
+    [Fact]
+    public void RewardMenu_Open_StaysPaused()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        bool ended = _zone.TryEndRewardMenu(HeadhunterRewardMenuState.Open, Start + 5, out _);
+
+        Assert.False(ended);
+        Assert.True(_zone.HasRewardMenu);
+        Assert.True(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void RewardMenu_HiddenAfterGrace_Resumes()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        bool ended = _zone.TryEndRewardMenu(HeadhunterRewardMenuState.Hidden, Start + 4, out _);
+
+        Assert.True(ended);
+        Assert.False(_zone.HasRewardMenu);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void RewardMenu_NotRewardPanel_Ignored()
+    {
+        StartHostileAndEndArrival();
+
+        bool started = _zone.TryStartRewardMenu(1, "FakePanelA", Start + 2);
+
+        Assert.False(started);
+        Assert.False(_zone.HasRewardMenu);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void RewardMenu_NonRewardPanelOpensWhileHeld_KeepsHold()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        bool started = _zone.TryStartRewardMenu(2, "FakePanelA", Start + 3);
+
+        Assert.False(started);
+        Assert.True(_zone.HasRewardMenu);
+        Assert.True(_zone.Freeze.IsPaused);
+        Assert.True(_zone.TryCloseRewardMenu(1, Start + 4, out _));
+    }
+
+    [Fact]
+    public void RewardMenu_OtherPanelCloses_StaysPaused()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+        _zone.Freeze.Apply(_config, _live);
+
+        bool ended = _zone.TryCloseRewardMenu(2, Start + 4, out _);
+
+        Assert.False(ended);
+        Assert.True(_zone.HasRewardMenu);
+        Assert.True(_zone.Freeze.IsPaused);
+        Assert.False(_zone.Freeze.IsApplyPending);
+    }
+
+    [Fact]
+    public void RewardMenu_NonCombatZone_Ignored()
+    {
+        _zone.OnScene(Town, true, Start);
+        Assert.False(_zone.WatchesRewardMenus);
+
+        bool started = _zone.TryStartRewardMenu(1, RewardName(), Start + 1);
+
+        Assert.False(started);
+        Assert.False(_zone.HasRewardMenu);
+    }
+
+    [Fact]
+    public void WatchesRewardMenus_Hostile_True()
+    {
+        _zone.OnScene(Hostile, false, Start);
+
+        Assert.True(_zone.WatchesRewardMenus);
+    }
+
+    [Fact]
+    public void RewardMenu_WithCutscene_ResumesOnlyWhenBothEnd()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartCutscene("FakeA", 20, Start + 2);
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        _zone.TryCloseRewardMenu(1, Start + 5, out _);
+        Assert.True(_zone.Freeze.IsPaused);
+
+        _zone.TryEndCutscene(HeadhunterCutsceneState.Missing, Start + 6, out _);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void TryPeekRewardMenu_LeavesFreeze()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+        _zone.Freeze.Apply(_config, _live);
+        bool pendingBefore = _zone.Freeze.IsApplyPending;
+
+        bool peeked = _zone.TryPeekRewardMenu(Start + 4, HeadhunterRewardMenuEnd.Scene, out _);
+
+        Assert.True(peeked);
+        Assert.True(_zone.Freeze.IsPaused);
+        Assert.True(_zone.HasRewardMenu);
+        Assert.Equal(pendingBefore, _zone.Freeze.IsApplyPending);
+    }
+
+    [Fact]
+    public void OnScene_DropsRewardMenu()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        _zone.OnScene(Hostile, false, Start + 3);
+        _zone.TryEndArrival(HeadhunterArrivalState.Damageable, Start + 4, out _);
+
+        Assert.False(_zone.HasRewardMenu);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    [Fact]
+    public void Clear_DropsRewardMenu()
+    {
+        StartHostileAndEndArrival();
+        _zone.TryStartRewardMenu(1, RewardName(), Start + 2);
+
+        _zone.Clear();
+
+        Assert.False(_zone.HasRewardMenu);
+        Assert.False(_zone.Freeze.IsPaused);
+    }
+
+    private static string RewardName()
+    {
+        return HeadhunterRewardPanels.TypeNames.First();
     }
 
     private void EndOne(bool intro)

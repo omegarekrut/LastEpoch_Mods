@@ -1,4 +1,5 @@
 using System.Globalization;
+using LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause.RewardMenu;
 
 namespace LastEpoch_Hud.Scripts.Core.CustomItems.Headhunter.Pause;
 
@@ -61,6 +62,16 @@ public static class HeadhunterPauseLog
         return $"Headhunter cutscene ended: scene={scene} id={stop.Cutscene.Id} duration={Seconds(stop.Cutscene.DurationSeconds)}s held={Seconds(stop.HeldSeconds)}s by={CutsceneCause(stop.By)}";
     }
 
+    public static string RewardMenuStarted(string scene, HeadhunterRewardMenu menu)
+    {
+        return $"Headhunter reward menu opened: scene={scene} panel={menu.Panel}";
+    }
+
+    public static string RewardMenuEnded(string scene, HeadhunterRewardMenuStop stop)
+    {
+        return $"Headhunter reward menu closed: scene={scene} panel={stop.Menu.Panel} held={Seconds(stop.HeldSeconds)}s by={RewardMenuCause(stop.By)}";
+    }
+
     private static string Seconds(double seconds)
     {
         return seconds.ToString("0.00", CultureInfo.InvariantCulture);
@@ -79,6 +90,18 @@ public static class HeadhunterPauseLog
             HeadhunterCutsceneEnd.Duration => "duration",
             HeadhunterCutsceneEnd.Stopped => "stopped",
             HeadhunterCutsceneEnd.Missing => "missing",
+            _ => "scene",
+        };
+    }
+
+    private static string RewardMenuCause(HeadhunterRewardMenuEnd by)
+    {
+        return by switch
+        {
+            HeadhunterRewardMenuEnd.Closed => "closed",
+            HeadhunterRewardMenuEnd.Hidden => "hidden",
+            HeadhunterRewardMenuEnd.Missing => "missing",
+            HeadhunterRewardMenuEnd.Cap => "cap",
             _ => "scene",
         };
     }
