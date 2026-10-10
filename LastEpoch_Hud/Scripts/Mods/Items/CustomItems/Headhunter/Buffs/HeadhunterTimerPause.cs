@@ -31,7 +31,8 @@ internal static class HeadhunterTimerPause
 
     public static bool HasRewardMenu => _zone.HasRewardMenu;
 
-    public static void OnSceneLoaded(string sceneName, double now)
+    /// <summary>Re-evaluates the zone pause for the newly active scene.</summary>
+    public static void OnActiveSceneChanged(string sceneName, double now)
     {
         DropCutscene(now);
         DropRewardMenu(now);
@@ -265,7 +266,7 @@ internal static class HeadhunterTimerPause
         }
     }
 
-    /// <summary>Logs a reward panel still held at scene load; the zone reset clears the hold itself.</summary>
+    /// <summary>Logs a reward panel still held at zone change; the zone reset clears the hold itself.</summary>
     private static void DropRewardMenu(double now)
     {
         _rewardPanel = null;
@@ -307,7 +308,7 @@ internal static class HeadhunterTimerPause
         }
     }
 
-    /// <summary>Logs a cutscene still held at scene load; the zone reset clears the hold itself.</summary>
+    /// <summary>Logs a cutscene still held at zone change; the zone reset clears the hold itself.</summary>
     private static void DropCutscene(double now)
     {
         _cutsceneDirector = null;

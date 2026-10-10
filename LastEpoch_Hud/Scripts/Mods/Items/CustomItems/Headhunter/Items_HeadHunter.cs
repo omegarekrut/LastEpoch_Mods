@@ -18,6 +18,8 @@ public class Items_HeadHunter : MonoBehaviour
 {
     private static readonly CustomUniqueRegistrar _registrar = new(CreateDefinition());
 
+    private static readonly HeadhunterActiveSceneGate _sceneGate = new();
+
     public Items_HeadHunter(System.IntPtr ptr)
         : base(ptr) { }
 
@@ -25,15 +27,32 @@ public class Items_HeadHunter : MonoBehaviour
     {
         HeadhunterConfigLoader.Load();
         SceneManager.add_sceneLoaded(new System.Action<Scene, LoadSceneMode>(OnSceneLoaded));
+        SceneManager.add_activeSceneChanged(new System.Action<Scene, Scene>(OnActiveSceneChanged));
     }
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         HeadhunterIconLoads.AllowRetry();
-        string active = SceneManager.GetActiveScene().name;
-        HeadhunterTimerPause.OnSceneLoaded(active, Time.unscaledTime);
-        HeadhunterProbe.OnSceneLoaded(active, Time.unscaledTime);
+        EnterActiveScene(SceneManager.GetActiveScene());
         ResetRunIfCharacterExit(scene.name);
+    }
+
+    private static void OnActiveSceneChanged(Scene previous, Scene next)
+    {
+        EnterActiveScene(next);
+    }
+
+    /// <summary>Re-evaluates the zone pause and probe once per newly active scene.</summary>
+    private static void EnterActiveScene(Scene scene)
+    {
+        string name = scene.name;
+        if (!_sceneGate.TryEnter(scene.handle, name))
+        {
+            return;
+        }
+
+        HeadhunterTimerPause.OnActiveSceneChanged(name, Time.unscaledTime);
+        HeadhunterProbe.OnActiveSceneChanged(name, Time.unscaledTime);
     }
 
     /// <summary>Clears the HH run on login/character select.</summary>

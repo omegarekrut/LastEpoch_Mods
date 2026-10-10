@@ -16,7 +16,7 @@ internal static class HeadhunterProbe
     public static string Scene { get; private set; } = string.Empty;
 
     /// <summary>Remembers the scene for log lines and resets the watch.</summary>
-    public static void OnSceneLoaded(string sceneName, double now)
+    public static void OnActiveSceneChanged(string sceneName, double now)
     {
         Scene = sceneName;
         _watch.Reset(now);
