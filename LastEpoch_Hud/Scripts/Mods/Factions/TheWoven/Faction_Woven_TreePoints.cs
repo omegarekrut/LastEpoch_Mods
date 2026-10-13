@@ -238,20 +238,6 @@ public class Faction_Woven_TreePoints
         }
     }
 
-    [HarmonyPatch(typeof(LocalTreeData.WeaverTreeData), "get_EarnedWeaverPoints")]
-    public class WeaverTreeData_GetEarned
-    {
-        [HarmonyPostfix]
-        static void Postfix(ref ushort __result)
-        {
-            if (writing || !Active())
-            {
-                return;
-            }
-            __result = (ushort)TargetPoints();
-        }
-    }
-
     [HarmonyPatch(typeof(TheWeaver), "get_EarnedWeaverPoints")]
     public class TheWeaver_GetEarned
     {

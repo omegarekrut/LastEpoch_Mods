@@ -10,6 +10,9 @@ public sealed class PatchHookSafetyTests
     private const string Header =
         "Hook-unsafe patch targets: MelonLoader's detour overwrites the first 6 bytes and mis-relocates a short branch there, so the game crashes (int3). Remove the patch or hook another method:";
 
+    private const string FoldedHeader =
+        "Patch targets share native code with other methods (identical code folding): the hook also runs for them with a wrong __instance and rewritten results. Hook another method, or add the id to KnownIssues.txt only for bugs you are not fixing now:";
+
     private static readonly Lazy<Cpp2IlAddressIndex> _index = new(() =>
         Cpp2IlAddressIndex.Load(GameEnvironment.Cpp2IlOutDir)
     );
@@ -43,6 +46,37 @@ public sealed class PatchHookSafetyTests
     }
 
     [Fact]
+    public void Patches_AreNotOnFoldedCode()
+    {
+        (IReadOnlyList<PatchDeclaration> patches, Cpp2IlAddressIndex index) = Index();
+
+        var folded = Folded(patches, index)
+            .Where(f => !KnownIssues.Contains(f.Patch.FoldedId))
+            .Select(f => Describe(f.Patch, f.Others))
+            .ToList();
+
+        Assert.True(folded.Count == 0, FoldedHeader + "\n" + string.Join("\n", folded));
+    }
+
+    [Fact]
+    public void KnownFoldedPatches_AreStillFolded()
+    {
+        (IReadOnlyList<PatchDeclaration> patches, Cpp2IlAddressIndex index) = Index();
+
+        var stillFolded = Folded(patches, index).Select(f => f.Patch.FoldedId).ToHashSet();
+        var fixedOnes = KnownIssues
+            .WithPrefix("folded:")
+            .Where(id => !stillFolded.Contains(id))
+            .ToList();
+
+        Assert.True(
+            fixedOnes.Count == 0,
+            "Gone or no longer folded; remove from KnownIssues.txt:\n"
+                + string.Join("\n", fixedOnes)
+        );
+    }
+
+    [Fact]
     public void Patches_HaveNativeOffsets()
     {
         (IReadOnlyList<PatchDeclaration> patches, Cpp2IlAddressIndex index) = Index();
@@ -58,6 +92,17 @@ public sealed class PatchHookSafetyTests
                 + string.Join("\n", withoutOffsets)
         );
     }
+
+    private static IEnumerable<(PatchDeclaration Patch, IReadOnlyList<string> Others)> Folded(
+        IReadOnlyList<PatchDeclaration> patches,
+        Cpp2IlAddressIndex index
+    ) =>
+        Resolved(patches)
+            .Select(p => (Patch: p, Others: index.FoldedWith(p.Target.FullName, p.Method)))
+            .Where(f => f.Others.Count > 0);
+
+    private static string Describe(PatchDeclaration patch, IReadOnlyList<string> others) =>
+        $"{patch.FoldedId} -> {patch.Target.FullName}.{patch.Method} shares code with {others.Count}: {string.Join(", ", others.Take(5))}";
 
     private static bool HasOffsets(PatchDeclaration patch, Cpp2IlAddressIndex index) =>
         index.TryGetOffsets(patch.Target.FullName, patch.Method, out IReadOnlyList<long> offsets)

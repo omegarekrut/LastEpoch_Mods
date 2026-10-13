@@ -183,7 +183,8 @@ public static class IllegalItemAdapter
         [HarmonyPostfix]
         static void Postfix(ItemDataUnpacked __instance)
         {
-            // Native equipment code can read the cached field directly.
+            // The field is the only SetId path: get_SetId shares native code with other
+            // getters and must not be hooked. Native code reads the field directly.
             if (ForeignSetPiece(__instance, out var source))
                 __instance.SetId = source.setID;
         }
@@ -210,17 +211,6 @@ public static class IllegalItemAdapter
         {
             if (ForeignSetPiece(__instance, out var source))
                 __result = source.uniqueID;
-        }
-    }
-
-    [HarmonyPatch(typeof(ItemDataUnpacked), "get_SetId")]
-    static class SetIdentity
-    {
-        [HarmonyPostfix]
-        static void Postfix(ItemDataUnpacked __instance, ref int __result)
-        {
-            if (ForeignSetPiece(__instance, out var source))
-                __result = source.setID;
         }
     }
 }

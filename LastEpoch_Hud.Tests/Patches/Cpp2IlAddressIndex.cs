@@ -6,25 +6,63 @@ namespace LastEpoch_Hud.Tests.Patches;
 /// <summary>Method name to GameAssembly.dll file offsets, read from cpp2il output.</summary>
 internal sealed class Cpp2IlAddressIndex
 {
+    // Methods without an address (abstract, stripped) stay known, with no offsets.
+    internal const long NoOffset = -1;
+
     private const string AddressAttribute = "AddressAttribute";
     private const string OffsetField = "Offset";
 
     private readonly Dictionary<string, List<long>> _offsets;
+    private readonly Dictionary<long, HashSet<string>> _methodsAt;
 
-    private Cpp2IlAddressIndex(Dictionary<string, List<long>> offsets) => _offsets = offsets;
+    private Cpp2IlAddressIndex(
+        Dictionary<string, List<long>> offsets,
+        Dictionary<long, HashSet<string>> methodsAt
+    )
+    {
+        _offsets = offsets;
+        _methodsAt = methodsAt;
+    }
 
     public static Cpp2IlAddressIndex Load(string cpp2IlOutDir)
     {
-        var offsets = new Dictionary<string, List<long>>();
+        var methods = new List<(string Type, string Method, long Offset)>();
         foreach (string dll in Directory.EnumerateFiles(cpp2IlOutDir, "*.dll"))
         {
             using var module = ModuleDefinition.ReadModule(dll);
-            foreach (TypeDefinition type in module.GetTypes())
-            {
-                AddMethods(offsets, type);
-            }
+            methods.AddRange(module.GetTypes().SelectMany(MethodsOf));
         }
-        return new Cpp2IlAddressIndex(offsets);
+        return FromMethods(methods);
+    }
+
+    public static Cpp2IlAddressIndex FromMethods(
+        IEnumerable<(string Type, string Method, long Offset)> methods
+    )
+    {
+        var offsets = new Dictionary<string, List<long>>();
+        var methodsAt = new Dictionary<long, HashSet<string>>();
+        foreach ((string type, string method, long offset) in methods)
+        {
+            string key = Key(type, Cpp2IlNames.ToInteropMethod(method));
+            if (!offsets.TryGetValue(key, out List<long> list))
+            {
+                offsets[key] = list = new List<long>();
+            }
+
+            if (offset == NoOffset)
+            {
+                continue;
+            }
+
+            list.Add(offset);
+            if (!methodsAt.TryGetValue(offset, out HashSet<string> keys))
+            {
+                methodsAt[offset] = keys = new HashSet<string>();
+            }
+
+            keys.Add(key);
+        }
+        return new Cpp2IlAddressIndex(offsets, methodsAt);
     }
 
     public bool TryGetOffsets(
@@ -39,19 +77,31 @@ internal sealed class Cpp2IlAddressIndex
         return found;
     }
 
-    private static void AddMethods(Dictionary<string, List<long>> offsets, TypeDefinition type)
+    /// <summary>Other methods whose native code starts at any offset of the target.</summary>
+    public IReadOnlyList<string> FoldedWith(string interopTypeFullName, string method)
     {
-        foreach (MethodDefinition method in type.Methods)
+        string key = Key(Cpp2IlNames.FromInteropType(interopTypeFullName), method);
+        if (!_offsets.TryGetValue(key, out List<long> targetOffsets))
         {
-            string key = Key(type.FullName, Cpp2IlNames.ToInteropMethod(method.Name));
-            if (!offsets.TryGetValue(key, out List<long> list))
-            {
-                offsets[key] = list = new List<long>();
-            }
-
-            list.AddRange(OffsetsOf(method));
+            return Array.Empty<string>();
         }
+
+        return targetOffsets
+            .SelectMany(offset => _methodsAt[offset])
+            .Where(other => other != key)
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ToList();
     }
+
+    private static IEnumerable<(string Type, string Method, long Offset)> MethodsOf(
+        TypeDefinition type
+    ) =>
+        type.Methods.SelectMany(method =>
+            OffsetsOf(method)
+                .DefaultIfEmpty(NoOffset)
+                .Select(offset => (type.FullName, method.Name, offset))
+        );
 
     private static IEnumerable<long> OffsetsOf(MethodDefinition method) =>
         method

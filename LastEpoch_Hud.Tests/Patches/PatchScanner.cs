@@ -2,17 +2,6 @@ using Mono.Cecil;
 
 namespace LastEpoch_Hud.Tests.Patches;
 
-/// <summary>One [HarmonyPatch(typeof(T), "Method", argTypes?)] found in the built mod.</summary>
-internal sealed record PatchDeclaration(
-    string PatchClass,
-    TypeReference Target,
-    string Method,
-    IReadOnlyList<string> ArgumentTypes
-)
-{
-    public string Id => $"patch:{PatchClass}";
-}
-
 /// <summary>Reads Harmony patch attributes from the mod DLL without loading it.</summary>
 internal static class PatchScanner
 {
@@ -36,15 +25,18 @@ internal static class PatchScanner
         CustomAttribute attribute
     )
     {
-        var args = attribute.ConstructorArguments;
+        Mono.Collections.Generic.Collection<CustomAttributeArgument> args =
+            attribute.ConstructorArguments;
         if (
             args.Count < 2
             || args[0].Value is not TypeReference target
             || args[1].Value is not string method
         )
+        {
             return null;
+        }
 
-        var argumentTypes =
+        List<string> argumentTypes =
             args.Count > 2 && args[2].Value is CustomAttributeArgument[] types
                 ? types.Select(t => ((TypeReference)t.Value).FullName).ToList()
                 : null;

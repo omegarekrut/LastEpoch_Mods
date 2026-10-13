@@ -1,2 +1,9 @@
 # Bugs that already exist. Tests skip these ids and fail once one is fixed, so remove it then.
 # Add an id only for a bug you are not fixing now. Format: <kind>:<name>
+# folded:<patch class> = hook on native code shared with other methods (ICF).
+folded:LastEpoch_Hud.Scripts.Mods.Items.CustomItems.Headhunter.Buffs.HeadhunterVisualsReachPatch
+folded:LastEpoch_Hud.Scripts.Mods.Factions.TheWoven.Faction_Woven_FreeRespe+TheWeaver_GetMemoryAmberRespecCostForWeaverTree
+folded:LastEpoch_Hud.Scripts.Mods.Difficulty.MonsterScaling+ActorSetRarityPatch
+folded:LastEpoch_Hud.Scripts.ModUI.Settings.DungeonRevealControls+Submit
+folded:LastEpoch_Hud.Scripts.Mods.Items.Items_Tooltip_LegendaryPotencial+TooltipItemManager_OpenTooltip
+folded:LastEpoch_Hud.Scripts.Mods.Items.Drop.Items_Drop_Rarity+TooltipItemManager_OpenTooltip
