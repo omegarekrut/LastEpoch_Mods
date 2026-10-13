@@ -12,7 +12,6 @@ internal static class HeadhunterReach
 {
     private static readonly HeadhunterReachScale _scale = new();
     private static bool _actorLogged;
-    private static bool _visualsLogged;
 
     public static void Sync(int liveBuffs)
     {
@@ -31,38 +30,10 @@ internal static class HeadhunterReach
             return;
         }
 
-        ScaleIfPlayer(
-            PointerOf(actor),
-            PointerOf(Refs_Manager.player_actor),
-            ref range,
-            ref _actorLogged,
-            "Actor"
-        );
+        ScaleIfPlayer(PointerOf(actor), PointerOf(Refs_Manager.player_actor), ref range);
     }
 
-    public static void ForVisuals(ActorVisuals visuals, ref float range)
-    {
-        if (_scale.IsNormal)
-        {
-            return;
-        }
-
-        ScaleIfPlayer(
-            PointerOf(visuals),
-            PointerOf(Refs_Manager.player_visuals),
-            ref range,
-            ref _visualsLogged,
-            "ActorVisuals"
-        );
-    }
-
-    private static void ScaleIfPlayer(
-        IntPtr instance,
-        IntPtr player,
-        ref float range,
-        ref bool logged,
-        string target
-    )
+    private static void ScaleIfPlayer(IntPtr instance, IntPtr player, ref float range)
     {
         float scaled = _scale.ScaleFor(instance, player, range);
         if (scaled == range)
@@ -71,20 +42,18 @@ internal static class HeadhunterReach
         }
 
         range = scaled;
-        if (logged)
+        if (_actorLogged)
         {
             return;
         }
 
-        logged = true;
+        _actorLogged = true;
         if (!ModSettings.Debug.Enabled.Value)
         {
             return;
         }
 
-        Main.logger_instance?.Msg(
-            "HH reach patch fired: " + target + " (factor " + _scale.Factor + ")"
-        );
+        Main.logger_instance?.Msg("HH reach patch fired: Actor (factor " + _scale.Factor + ")");
     }
 
     private static IntPtr PointerOf(Il2CppObjectBase o)

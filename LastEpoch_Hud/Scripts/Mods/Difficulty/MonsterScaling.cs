@@ -249,29 +249,6 @@ public class MonsterScaling
         }
     }
 
-    [HarmonyPatch(typeof(Actor), "setRarity")]
-    public class ActorSetRarityPatch
-    {
-        [HarmonyPrefix]
-        static void Prefix(Actor __instance, ref Actor.Rarity __0)
-        {
-            try
-            {
-                int force = GetForceRarity();
-                if (force <= 0)
-                    return;
-                if (!ShouldForceRarity(__instance))
-                    return;
-
-                if (force == 1 && __0 == Actor.Rarity.Normal)
-                    __0 = Actor.Rarity.Magic;
-                else if (force >= 2)
-                    __0 = Actor.Rarity.Rare;
-            }
-            catch { }
-        }
-    }
-
     [HarmonyPatch(typeof(MonsterRarityManager), "setRarity")]
     public class MonsterRarityManagerPatch
     {
