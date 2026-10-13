@@ -101,6 +101,25 @@ public sealed class Cpp2IlAddressIndexTests
     }
 
     [Fact]
+    public void TargetKey_StripsInteropPrefix()
+    {
+        Assert.Equal("Fake::get_A", Cpp2IlAddressIndex.TargetKey("Il2Cpp.Fake", "get_A"));
+        Assert.Equal("LE.Ns.Fake::Do", Cpp2IlAddressIndex.TargetKey("Il2CppLE.Ns.Fake", "Do"));
+    }
+
+    [Fact]
+    public void FoldedWithKey_MatchesFoldedWith()
+    {
+        var index = Cpp2IlAddressIndex.FromMethods([
+            ("Fake", "get_A", 0x10),
+            ("Fake", "get_B", 0x10),
+        ]);
+
+        Assert.Equal(["Fake::get_B"], index.FoldedWithKey("Fake::get_A"));
+        Assert.Equal(index.FoldedWith("Il2Cpp.Fake", "get_A"), index.FoldedWithKey("Fake::get_A"));
+    }
+
+    [Fact]
     public void TryGetOffsets_MethodWithoutAddress_FoundWithNoOffsets()
     {
         var index = Cpp2IlAddressIndex.FromMethods([

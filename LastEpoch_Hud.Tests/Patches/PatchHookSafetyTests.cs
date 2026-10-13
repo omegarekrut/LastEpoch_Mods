@@ -77,6 +77,25 @@ public sealed class PatchHookSafetyTests
     }
 
     [Fact]
+    public void FoldedAliases_AreStillNeeded()
+    {
+        (IReadOnlyList<PatchDeclaration> patches, Cpp2IlAddressIndex index) = Index();
+        var patched = Resolved(patches)
+            .Select(p => Cpp2IlAddressIndex.TargetKey(p.Target.FullName, p.Method))
+            .ToHashSet();
+
+        var problems = FoldedAliases
+            .Known.Keys.SelectMany(key => AliasProblems(key, patched, index))
+            .ToList();
+
+        Assert.True(
+            problems.Count == 0,
+            "Folded alias allow-list is out of date (retarget the hook or update FoldedAliases):\n"
+                + string.Join("\n", problems)
+        );
+    }
+
+    [Fact]
     public void Patches_HaveNativeOffsets()
     {
         (IReadOnlyList<PatchDeclaration> patches, Cpp2IlAddressIndex index) = Index();
@@ -98,8 +117,37 @@ public sealed class PatchHookSafetyTests
         Cpp2IlAddressIndex index
     ) =>
         Resolved(patches)
-            .Select(p => (Patch: p, Others: index.FoldedWith(p.Target.FullName, p.Method)))
+            .Select(p =>
+                (
+                    Patch: p,
+                    Others: FoldedAliases.Unexpected(
+                        FoldedAliases.Known,
+                        Cpp2IlAddressIndex.TargetKey(p.Target.FullName, p.Method),
+                        index.FoldedWith(p.Target.FullName, p.Method)
+                    )
+                )
+            )
             .Where(f => f.Others.Count > 0);
+
+    private static IEnumerable<string> AliasProblems(
+        string key,
+        IReadOnlySet<string> patched,
+        Cpp2IlAddressIndex index
+    )
+    {
+        if (!patched.Contains(key))
+        {
+            yield return $"{key}: no patch targets it";
+            yield break;
+        }
+
+        foreach (
+            string alias in FoldedAliases.Stale(FoldedAliases.Known, key, index.FoldedWithKey(key))
+        )
+        {
+            yield return $"{key} no longer shares code with {alias}";
+        }
+    }
 
     private static string Describe(PatchDeclaration patch, IReadOnlyList<string> others) =>
         $"{patch.FoldedId} -> {patch.Target.FullName}.{patch.Method} shares code with {others.Count}: {string.Join(", ", others.Take(5))}";

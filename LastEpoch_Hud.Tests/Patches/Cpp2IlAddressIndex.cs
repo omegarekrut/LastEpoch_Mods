@@ -71,16 +71,26 @@ internal sealed class Cpp2IlAddressIndex
         out IReadOnlyList<long> fileOffsets
     )
     {
-        string key = Key(Cpp2IlNames.FromInteropType(interopTypeFullName), method);
-        bool found = _offsets.TryGetValue(key, out List<long> list);
+        bool found = _offsets.TryGetValue(
+            TargetKey(interopTypeFullName, method),
+            out List<long> list
+        );
         fileOffsets = list;
         return found;
     }
 
+    /// <summary>Key (cpp2il type::method) of an interop target.</summary>
+    public static string TargetKey(string interopTypeFullName, string method) =>
+        Key(Cpp2IlNames.FromInteropType(interopTypeFullName), method);
+
     /// <summary>Other methods whose native code starts at any offset of the target.</summary>
-    public IReadOnlyList<string> FoldedWith(string interopTypeFullName, string method)
+    public IReadOnlyList<string> FoldedWith(string interopTypeFullName, string method) =>
+        FoldedWithKey(TargetKey(interopTypeFullName, method));
+
+    /// <summary>Same as <see cref="FoldedWith"/>, for a key from <see cref="TargetKey"/>.</summary>
+    public IReadOnlyList<string> FoldedWithKey(string targetKey)
     {
-        string key = Key(Cpp2IlNames.FromInteropType(interopTypeFullName), method);
+        string key = targetKey;
         if (!_offsets.TryGetValue(key, out List<long> targetOffsets))
         {
             return Array.Empty<string>();

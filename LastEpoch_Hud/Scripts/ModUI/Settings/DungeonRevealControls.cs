@@ -1,4 +1,3 @@
-using HarmonyLib;
 using LastEpoch_Hud.Scripts.ModUI.Shell;
 using UnityEngine;
 using UnityEngine.UI;
@@ -177,34 +176,6 @@ internal static class DungeonRevealControls
         var line = separator.AddComponent<Image>();
         line.color = HudTheme.Accent;
         line.raycastTarget = false;
-    }
-
-    static void Save(Toggle toggle)
-    {
-        if (toggle.IsNullOrDestroyed())
-            return;
-        if (toggle.name == RevealName)
-        {
-            ModSettings.DungeonReveal.Enabled.Set(toggle.isOn);
-        }
-        if (toggle.name == KeylessName)
-        {
-            ModSettings.ScenesDungeons.EnterWithoutKey.Set(toggle.isOn);
-        }
-    }
-
-    [HarmonyPatch(typeof(Toggle), "OnPointerClick")]
-    static class Click
-    {
-        [HarmonyPostfix]
-        static void Postfix(Toggle __instance) => Save(__instance);
-    }
-
-    [HarmonyPatch(typeof(Toggle), "OnSubmit")]
-    static class Submit
-    {
-        [HarmonyPostfix]
-        static void Postfix(Toggle __instance) => Save(__instance);
     }
 
     static GameObject Node(
